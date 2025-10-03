@@ -1,5 +1,6 @@
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
+import pandas as pd
 
 def obter_htmls():
   # raiz dos enderecos a serem raspados
@@ -24,31 +25,44 @@ def extrair_dados(html):
   lista_bilionarios = main_tag.find_all('li')
   lista_linhas = []
   for bilionario in lista_bilionarios:
-    # refazer abaixo usando contents!
-    posicao = int(str(bilionario.find('span', class_='posicao')).split('>')[1].strip())
-    nome = str(bilionario.find('h3')).split('>')[3].split('<')[0].strip()
+    posicao = int(str(bilionario.find('span', class_='posicao').text).strip())
+    nome = str(bilionario.find('h3').contents[2]).strip()
+    # caso em que o campo idade nao existe:
+    if 'Idade' not in bilionario.find('div', class_='info').text:
+      idade = 0
+    else:
+      idade = bilionario.find('div', class_='info').contents[1].find('strong')
+      idade = int(idade.text.strip().split(' ')[0])
+    # caso em que não consta naturalidade:
+    if bilionario.find('div', class_='info').contents[1].text == '\n':
+      naturalidade == ''
+    # caso em que não consta nem naturalidade nem idade:
+    elif idade == 0:
+      naturalidade = bilionario.find('div', class_='info').contents[1].find('strong').text.strip()
+    else:
+      naturalidade = bilionario.find('div', class_='info').contents[3].find('strong').text.strip()
+    patrimonio = float(bilionario.find('span', class_='patrimonio').find('strong').text.split(' ')[1].replace(',', '.'))
+    origem = bilionario.find('span', class_='origem-patrimonio').find('strong').text.strip()
+    texto = bilionario.find('div', class_='texto')
+    # caso em que não consta texto descritivo:
+    if texto is None:
+      texto = ''
+    else:
+      texto = texto.text.strip()
+    linha = [posicao, nome, idade, naturalidade, patrimonio, origem, texto]
+    lista_linhas.append(linha)
+  resultado = pd.DataFrame(lista_linhas, columns=['Posição', 'Nome', 'Idade', 'Naturalidade', 'Patrimonio (R$ bi)', 'Origem', 'Texto'])
+  return resultado
   
-  return (posicao, nome)
-  
-  
-  
-
-
-
-
-# salvando esse conteudo em arquivos
+def consolidar_dados(lista_htmls):
+  lista_dfs = []
+  for html in lista_htmls:
+    lista_dfs.append(extrair_dados(html))
+  return pd.concat(lista_dfs, ignore_index=True)
 
 
 if __name__ == '__main__':
   lista_htmls = obter_htmls()
-  teste = extrair_dados(lista_htmls[0])
-  print(teste[0], teste[1])
-  
-  
-  
-  
-  
-  
-  
-  
+  df_bilionarios = consolidar_dados(lista_htmls)
+  df_bilionarios.to_csv('projeto-final/dados/bilionarios.csv', index=False)
 
